@@ -27,12 +27,15 @@ ngx_preinit_modules(void)
 {
     ngx_uint_t  i;
 
+    // ngx_modules的由来：编译器时根据nginx.conf配置文件(类似tomcat中的server.xml)，生成的一个nginx_module.c文件 (ref: auto/make脚本)，
+    //                  其中有个变量 ngx_modules: 是把nginx.conf 中定义的模块解析好，放到ngx_modules
+    // tips: 这里再次对ngx_modules中的模块设置index和name
     for (i = 0; ngx_modules[i]; i++) {
         ngx_modules[i]->index = i;
         ngx_modules[i]->name = ngx_module_names[i];
     }
 
-    ngx_modules_n = i;
+    ngx_modules_n = i; // 模块数量
     ngx_max_module = ngx_modules_n + NGX_MAX_DYNAMIC_MODULES;
 
     return NGX_OK;
@@ -53,6 +56,9 @@ ngx_cycle_modules(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
 
+    /*
+     * copy static modules to the cycle variable
+     */
     ngx_memcpy(cycle->modules, ngx_modules,
                ngx_modules_n * sizeof(ngx_module_t *));
 
@@ -68,6 +74,7 @@ ngx_init_modules(ngx_cycle_t *cycle)
     ngx_uint_t  i;
 
     for (i = 0; cycle->modules[i]; i++) {
+        // 回调函数: 初始化所有的module
         if (cycle->modules[i]->init_module) {
             if (cycle->modules[i]->init_module(cycle) != NGX_OK) {
                 return NGX_ERROR;

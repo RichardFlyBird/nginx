@@ -231,11 +231,11 @@ struct ngx_module_s {
     ngx_uint_t            version;
     const char           *signature;
 
-    void                 *ctx;
+    void                 *ctx; // 伴随内存，使用万能指针
     ngx_command_t        *commands;
     ngx_uint_t            type;
 
-    ngx_int_t           (*init_master)(ngx_log_t *log);
+    ngx_int_t           (*init_master)(ngx_log_t *log); // 函数指针: 模块的各种初始化函数
 
     ngx_int_t           (*init_module)(ngx_cycle_t *cycle);
 
@@ -274,7 +274,7 @@ ngx_int_t ngx_add_module(ngx_conf_t *cf, ngx_str_t *file,
     ngx_module_t *module, char **order);
 
 
-extern ngx_module_t  *ngx_modules[];
+extern ngx_module_t  *ngx_modules[]; // 全局字段，保存了最初始的 nginx.conf中的模块配置。后续把ngx_modules copy到各个cycle中进行使用，可能在cycle中有调整。但是不影响全局变量ngx_modules。
 extern ngx_uint_t     ngx_max_module;
 
 extern char          *ngx_module_names[];

@@ -198,7 +198,7 @@ main(int argc, char *const *argv)
     ngx_buf_t        *b;
     ngx_log_t        *log;
     ngx_uint_t        i;
-    ngx_cycle_t      *cycle, init_cycle;
+    ngx_cycle_t      *cycle, init_cycle; // *cycle指针在栈上; init_cycle整个结构体都在栈上
     ngx_conf_dump_t  *cd;
     ngx_core_conf_t  *ccf;
 
@@ -228,7 +228,7 @@ main(int argc, char *const *argv)
     ngx_regex_init();
 #endif
 
-    ngx_pid = ngx_getpid();
+    ngx_pid = ngx_getpid(); // 当前进程pid，当前进程是master进程
     ngx_parent = ngx_getppid();
 
     log = ngx_log_init(ngx_prefix, ngx_error_log);
@@ -289,6 +289,11 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    /**
+     * cycle就是nginx中的事件循环:
+     *     1. 创建了conf，且进行init
+     *     2. 打开且监听了端口 
+     */
     cycle = ngx_init_cycle(&init_cycle);
     if (cycle == NULL) {
         if (ngx_test_config) {
@@ -377,9 +382,11 @@ main(int argc, char *const *argv)
     ngx_use_stderr = 0;
 
     if (ngx_process == NGX_PROCESS_SINGLE) {
+        // standalone模式: 单进程即是master，又是worker。常用于测试环境
         ngx_single_process_cycle(cycle);
 
     } else {
+        // 多进程模型，master 和 worker是分开的进程。生产环境的常见模型
         ngx_master_process_cycle(cycle);
     }
 

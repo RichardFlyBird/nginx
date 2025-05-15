@@ -50,7 +50,7 @@ static ngx_core_module_t  ngx_errlog_module_ctx = {
     NULL
 };
 
-
+// ngx_errlog_module 类型是 NGX_CORE_MODULE，表明是核心模块
 ngx_module_t  ngx_errlog_module = {
     NGX_MODULE_V1,
     &ngx_errlog_module_ctx,                /* module context */

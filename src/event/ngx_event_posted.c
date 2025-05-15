@@ -10,6 +10,7 @@
 #include <ngx_event.h>
 
 
+// nginx中的三个队列，worker进程在处理。类似于 netty中的三个队列
 ngx_queue_t  ngx_posted_accept_events;
 ngx_queue_t  ngx_posted_next_events;
 ngx_queue_t  ngx_posted_events;

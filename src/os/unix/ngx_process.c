@@ -33,7 +33,7 @@ char           **ngx_os_argv;
 ngx_int_t        ngx_process_slot;
 ngx_socket_t     ngx_channel;
 ngx_int_t        ngx_last_process;
-ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
+ngx_process_t    ngx_processes[NGX_MAX_PROCESSES]; // 全局变量，保存 worker 进程列表
 
 
 ngx_signal_t  signals[] = {
@@ -114,7 +114,13 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
         /* Solaris 9 still has no AF_LOCAL */
 
-        if (socketpair(AF_UNIX, SOCK_STREAM, 0, ngx_processes[s].channel) == -1)
+        /**
+         * 进程间通讯的常见方式, 设置socket套接字。此时仍然是 master进程在执行代码.
+         *     主进程master hold socketpair的一端 p1；子进程 worker hold socketpair的另一端 p2。
+         *     主进程master 向 p1 发送数据给，子进程worker可以从另外一端 p2 监听并且接收数据，然后处理。
+         *     tips: 由此可见 nginx的 master worker 进程间的通讯是通过 socketpair 来实现的。
+         */
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, ngx_processes[s]. ) == -1)
         {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "socketpair() failed while spawning \"%s\"", name);
@@ -150,6 +156,10 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
             return NGX_INVALID_PID;
         }
 
+        /**
+         * channel[0] 设置master进程的pid: ngx_pid
+         *     tips: channel[0] 是 master进程 hold 的一端，channel[1] 是 worker进程 hold 的一端
+         */
         if (fcntl(ngx_processes[s].channel[0], F_SETOWN, ngx_pid) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "fcntl(F_SETOWN) failed while spawning \"%s\"", name);
@@ -183,23 +193,30 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     ngx_process_slot = s;
 
 
+    /**
+     * fork 子进程
+     *    1. return 0: 子进程
+     *    2. return > 0: 父进程
+     *    3. return -1: 失败
+     *    tips: 由此可见 nginx的 master worker 进程间的通讯是通过 fork 来实现的。
+     */
     pid = fork();
 
     switch (pid) {
 
-    case -1:
+    case -1: /* error */
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "fork() failed while spawning \"%s\"", name);
         ngx_close_channel(ngx_processes[s].channel, cycle->log);
         return NGX_INVALID_PID;
 
-    case 0:
-        ngx_parent = ngx_pid;
-        ngx_pid = ngx_getpid();
-        proc(cycle, data);
+    case 0: /* 子进程 */
+        ngx_parent = ngx_pid; // 子进程的 父亲是 ngx_parent
+        ngx_pid = ngx_getpid(); // 子进程在此执行，重新获取pid，赋值给 全局变量 ngx_pid，代表了子进程的pid
+        proc(cycle, data); // 子进程执行回调方法
         break;
 
-    default:
+    default: /* 父进程 */
         break;
     }
 

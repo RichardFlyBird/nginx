@@ -37,10 +37,12 @@ ngx_array_init(ngx_array_t *array, ngx_pool_t *pool, ngx_uint_t n, size_t size)
      */
 
     array->nelts = 0;
-    array->size = size;
-    array->nalloc = n;
-    array->pool = pool;
+    array->size = size; // 每个元素的大小
+    array->nalloc = n; // 元素个数
+    array->pool = pool; // 数组位于 哪个内存池中
 
+    // 从内存池中分配一片内存，大小为 n * size，赋值给 array->elts，作为数据内首个元素的地址
+    // 注意：这里的 n 是数组的元素个数，size 是每个元素的大小
     array->elts = ngx_palloc(pool, n * size);
     if (array->elts == NULL) {
         return NGX_ERROR;

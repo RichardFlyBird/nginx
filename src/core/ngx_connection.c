@@ -470,7 +470,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 }
 #endif
 
-                ls[i].add_reuseport = 0;
+                ls[i].add_reuseport = 0; // 是否支持 端口复用，正常Linux中一个端口只能被一个进程监听。若想被多个进程监听，然后让Linux内部把accept请求的处理 负载均衡到不同的进程，则需要使用SO_REUSEPORT
             }
 #endif
 
@@ -487,6 +487,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 continue;
             }
 
+            // 1. sys_socket() 系统调用，创建一个socket文件描述符。
             s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type, 0);
 
             if (s == (ngx_socket_t) -1) {
@@ -495,8 +496,10 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
+            // SOCK_DGRAM: 代表UDP。而通常nginx 用于TCP场景
             if (ls[i].type != SOCK_DGRAM || !ngx_test_config) {
 
+                // SO_REUSEADDR: 地址复用
                 if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
                                (const void *) &reuseaddr, sizeof(int))
                     == -1)
@@ -601,6 +604,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             ngx_log_debug2(NGX_LOG_DEBUG_CORE, log, 0,
                            "bind() %V #%d ", &ls[i].addr_text, s);
 
+            // 2. 绑定端口
             if (bind(s, ls[i].sockaddr, ls[i].socklen) == -1) {
                 err = ngx_socket_errno;
 
@@ -649,11 +653,13 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
             }
 #endif
 
+            // SOCK_STREAM: 代表tcp。通常nginx都是监听处理tcp连接
             if (ls[i].type != SOCK_STREAM) {
                 ls[i].fd = s;
                 continue;
             }
 
+            // 3. 监听端口. backlog 是三次握手后的那个队列，即accept队列（不是半同步队列: sync queue）
             if (listen(s, ls[i].backlog) == -1) {
                 err = ngx_socket_errno;
 
@@ -723,11 +729,13 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
     struct accept_filter_arg   af;
 #endif
 
+    // ls: 代表nginx需要监听的所有 socket信息，是个数组
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
 
         ls[i].log = *ls[i].logp;
 
+        // 设置 rcvbuf 接收缓冲区大小
         if (ls[i].rcvbuf != -1) {
             if (setsockopt(ls[i].fd, SOL_SOCKET, SO_RCVBUF,
                            (const void *) &ls[i].rcvbuf, sizeof(int))
@@ -739,6 +747,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
             }
         }
 
+        // 设置 sndbuf 发送缓冲区大小
         if (ls[i].sndbuf != -1) {
             if (setsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF,
                            (const void *) &ls[i].sndbuf, sizeof(int))
@@ -750,6 +759,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
             }
         }
 
+        // 设置 keepalive 选项
         if (ls[i].keepalive) {
             value = (ls[i].keepalive == 1) ? 1 : 0;
 

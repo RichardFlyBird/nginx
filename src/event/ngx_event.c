@@ -216,6 +216,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 #endif
     }
 
+    // 事件处理
     if (ngx_use_accept_mutex) {
         if (ngx_accept_disabled > 0) {
             ngx_accept_disabled--;
@@ -238,6 +239,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         }
     }
 
+    // 1. 处理队列1 中的事件
     if (!ngx_queue_empty(&ngx_posted_next_events)) {
         ngx_event_move_posted_next(cycle);
         timer = 0;
@@ -252,6 +254,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "timer delta: %M", delta);
 
+    // 2. 处理队列2 中的事件     
     ngx_event_process_posted(cycle, &ngx_posted_accept_events);
 
     if (ngx_accept_mutex_held) {
@@ -259,7 +262,8 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     }
 
     ngx_event_expire_timers();
-
+    
+    // 3. 处理队列3 中的事件     
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
 

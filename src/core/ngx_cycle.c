@@ -72,6 +72,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     }
     pool->log = log;
 
+    // 从内存池中分配一小片内存，给cycle
     cycle = ngx_pcalloc(pool, sizeof(ngx_cycle_t));
     if (cycle == NULL) {
         ngx_destroy_pool(pool);
@@ -124,6 +125,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     n = old_cycle->paths.nelts ? old_cycle->paths.nelts : 10;
 
+    // 分配一片内存，作为一个c语言的数组
     if (ngx_array_init(&cycle->paths, pool, n, sizeof(ngx_path_t *))
         != NGX_OK)
     {
@@ -131,9 +133,10 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         return NULL;
     }
 
+    // 内存置零
     ngx_memzero(cycle->paths.elts, n * sizeof(ngx_path_t *));
 
-
+    // 分配一片内存，作为一个c语言的数组
     if (ngx_array_init(&cycle->config_dump, pool, 1, sizeof(ngx_conf_dump_t))
         != NGX_OK)
     {
@@ -151,7 +154,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         }
 
     } else {
-        n = 20;
+        n = 20; // 默认20个文件句柄
     }
 
     if (ngx_list_init(&cycle->open_files, pool, n, sizeof(ngx_open_file_t))
@@ -221,7 +224,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
 
-
+    // copy static modules to the cycle variable
     if (ngx_cycle_modules(cycle) != NGX_OK) {
         ngx_destroy_pool(pool);
         return NULL;
@@ -236,11 +239,12 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         module = cycle->modules[i]->ctx;
 
         if (module->create_conf) {
-            rv = module->create_conf(cycle);
+            rv = module->create_conf(cycle); // 创建conf
             if (rv == NULL) {
                 ngx_destroy_pool(pool);
                 return NULL;
             }
+            // 每一个模块所属的 conf文件 都保存在cycle->conf_ctx 数组中
             cycle->conf_ctx[cycle->modules[i]->index] = rv;
         }
     }
@@ -300,6 +304,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         module = cycle->modules[i]->ctx;
 
         if (module->init_conf) {
+            // 这里回调 init_conf
             if (module->init_conf(cycle,
                                   cycle->conf_ctx[cycle->modules[i]->index])
                 == NGX_CONF_ERROR)
@@ -502,6 +507,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* handle the listening sockets */
 
+    // 处理监听的端口。这里 old_cycle->listening 没有被赋值，走else流程
     if (old_cycle->listening.nelts) {
         ls = old_cycle->listening.elts;
         for (i = 0; i < old_cycle->listening.nelts; i++) {
@@ -598,7 +604,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
             }
         }
 
-    } else {
+    } else { // 默认启动时走else
         ls = cycle->listening.elts;
         for (i = 0; i < cycle->listening.nelts; i++) {
             ls[i].open = 1;
@@ -615,10 +621,22 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
         }
     }
 
+    /**
+     * 监听socket三部曲:
+     *     1. sys_socket() 创建一个socket，代表server socket
+     *     2. sys_bind() 绑定socket到指定的端口
+     *     3. sys_listen() 监听socket，开始接收连接
+     */
     if (ngx_open_listening_sockets(cycle) != NGX_OK) {
         goto failed;
     }
 
+    /**
+     * 设置server socket属性，也是需要调用内核的系统调用进行设置: 
+     *     1. rcvbuf 接收缓冲区大小
+     *     2. sndbuf 发送缓冲区大小
+     *     3. keepalive 开启keepalive
+     */
     if (!ngx_test_config) {
         ngx_configure_listening_sockets(cycle);
     }
@@ -642,6 +660,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* free the unnecessary shared memory */
 
+    // 有可能 ngx_init_modules()往 part中放入数据了，所以这里再次遍历一遍执行。就像spring中的一个BFPP内部注册了另外一个BFPP
     opart = &old_cycle->shared_memory.part;
     oshm_zone = opart->elts;
 
@@ -766,6 +785,7 @@ old_shm_zone_done:
 
     ngx_destroy_pool(conf.temp_pool);
 
+    // 当前启动进程是 NGX_PROCESS_MASTER，这里直接返回了
     if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
 
         ngx_destroy_pool(old_cycle->pool);

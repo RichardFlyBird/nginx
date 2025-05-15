@@ -119,6 +119,9 @@ ngx_reset_pool(ngx_pool_t *pool)
 }
 
 
+// nginx中的两种内存分配算法，贼简单:small 和 large
+// 1. small: 直接从pool中分配
+// 2. large: malloc直接从c堆上重新申请一片内存
 void *
 ngx_palloc(ngx_pool_t *pool, size_t size)
 {
@@ -161,6 +164,7 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
         }
 
         if ((size_t) (p->d.end - m) >= size) {
+            // 类似于malloc中推edata指针分配堆内存，速度很快
             p->d.last = m + size;
 
             return m;

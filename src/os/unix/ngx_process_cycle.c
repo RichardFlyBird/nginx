@@ -96,6 +96,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     sigaddset(&set, ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
     sigaddset(&set, ngx_signal_value(NGX_CHANGEBIN_SIGNAL));
 
+    // 屏蔽上面的Linux信号，应该是nginx 用户进程自己想使用那些信号。自己屏蔽，不影响其他进程
     if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "sigprocmask() failed");
@@ -122,13 +123,16 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
         p = ngx_cpystrn(p, (u_char *) ngx_argv[i], size);
     }
 
+    // 设置进程标题
     ngx_setproctitle(title);
 
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // 启动worker进程。 worker_processes 是 nginx.conf 中配置的，默认是1
     ngx_start_worker_processes(cycle, ccf->worker_processes,
                                NGX_PROCESS_RESPAWN);
+    // 启动cache manager 进程                               
     ngx_start_cache_manager_processes(cycle, 0);
 
     ngx_new_binary = 0;
@@ -136,6 +140,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     sigio = 0;
     live = 1;
 
+    // master 进程陷入死循环，等待信号，然后执行相应动作
     for ( ;; ) {
         if (delay) {
             if (ngx_sigalrm) {
@@ -341,6 +346,8 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     for (i = 0; i < n; i++) {
 
+        // 此时CPU仍然在执行父进程中代码, 执行ngx_spawn_process() fork出子进程，
+        // 子进程会回调执行ngx_worker_process_cycle()进行回调
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
                           (void *) (intptr_t) i, "worker process", type);
 
@@ -698,7 +705,7 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 static void
 ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 {
-    ngx_int_t worker = (intptr_t) data;
+    ngx_int_t worker = (intptr_t) data; // 进程索引下标，即表示属于 master 进程的第几个 worker 进程
 
     ngx_process = NGX_PROCESS_WORKER;
     ngx_worker = worker;
@@ -707,6 +714,9 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
     ngx_setproctitle("worker process");
 
+    /**
+     *  worker 进程陷入死循环
+     */
     for ( ;; ) {
 
         if (ngx_exiting) {
@@ -718,6 +728,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
+        // worker的核心流程
         ngx_process_events_and_timers(cycle);
 
         if (ngx_terminate) {

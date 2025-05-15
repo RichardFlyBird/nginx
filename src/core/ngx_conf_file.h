@@ -67,6 +67,7 @@
 #define NGX_CONF_BLOCK_DONE  2
 #define NGX_CONF_FILE_DONE   3
 
+// 定义模块类型，类似枚举
 #define NGX_CORE_MODULE      0x45524F43  /* "CORE" */
 #define NGX_CONF_MODULE      0x464E4F43  /* "CONF" */
 
@@ -77,6 +78,11 @@
 struct ngx_command_s {
     ngx_str_t             name;
     ngx_uint_t            type;
+    /** 函数指针解释:
+     * char * : 返回值
+     * (*set) : 函数指针的函数名
+     * (ngx_conf_t *cf, ngx_command_t *cmd, void *conf) : 函数指针的参数列表
+     */
     char               *(*set)(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
     ngx_uint_t            conf;
     ngx_uint_t            offset;
