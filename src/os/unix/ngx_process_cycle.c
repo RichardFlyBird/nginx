@@ -736,6 +736,10 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
             ngx_worker_process_exit(cycle);
         }
 
+        /**
+         * 下面的 ngx_quit ngx_reopen 等是如何设置的呢？
+         *      1. 由 master 进程设置，通过socketpare，master -> worker 进行通信
+         */
         if (ngx_quit) {
             ngx_quit = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
@@ -910,6 +914,7 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 
     for (i = 0; cycle->modules[i]; i++) {
         if (cycle->modules[i]->init_process) {
+            // 子进程 执行回调: init_process
             if (cycle->modules[i]->init_process(cycle) == NGX_ERROR) {
                 /* fatal */
                 exit(2);

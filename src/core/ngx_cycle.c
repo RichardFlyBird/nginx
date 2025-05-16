@@ -785,7 +785,7 @@ old_shm_zone_done:
 
     ngx_destroy_pool(conf.temp_pool);
 
-    // 当前启动进程是 NGX_PROCESS_MASTER，这里直接返回了
+    // 当前启动进程是 NGX_PROCESS_MASTER ,这里直接返回了
     if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
 
         ngx_destroy_pool(old_cycle->pool);

@@ -216,7 +216,6 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 #endif
     }
 
-    // 事件处理
     if (ngx_use_accept_mutex) {
         if (ngx_accept_disabled > 0) {
             ngx_accept_disabled--;
@@ -247,6 +246,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     delta = ngx_current_msec;
 
+    // 事件处理
     (void) ngx_process_events(cycle, timer, flags);
 
     delta = ngx_current_msec - delta;
