@@ -231,11 +231,17 @@ struct ngx_module_s {
     ngx_uint_t            version;
     const char           *signature;
 
-    void                 *ctx; // 伴随内存，使用万能指针
+    /**
+     * ctx 作为每个module个性化的伴随内存，保存每个module自己的上下文: 可能是数据，可能是一堆函数指针(void *万能指针可以保存任一类型的数据，至于到底是什么取决于在使用时，编译器根据数据类型进行具体解释)。总之是module的个性化数据。
+     *     例如: ngx_epoll_module模块的ctx是: ngx_epoll_module_ctx，即是epoll相关的
+     * 
+     */
+    void                 *ctx;
     ngx_command_t        *commands;
     ngx_uint_t            type;
 
-    ngx_int_t           (*init_master)(ngx_log_t *log); // 函数指针: 模块的各种初始化函数
+    //  下面是一堆函数指针: 模块的各种初始化函数，有的在master中执行，有的是在fork出来的worker中执行
+    ngx_int_t           (*init_master)(ngx_log_t *log);
 
     ngx_int_t           (*init_module)(ngx_cycle_t *cycle);
 

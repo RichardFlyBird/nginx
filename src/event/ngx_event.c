@@ -216,6 +216,13 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 #endif
     }
 
+    /**
+     * worker中执行的代码. 哪个worker进程抢到 ngx_accept_mutex，就由哪个worker进程处理accept事件
+     *     1. worker抢到mutex锁，则把自己的server fd (每个worker中都有一个server FD对象，虽然地址不同，但是指向的是同一个port) 添加到event loop中，监听accept事件
+     *     2. worker没抢到mutex锁，则不会监听accept事件
+     *   以此避免多个worker同时监听到server fd的accept事件，防止被集体唤醒，出现惊群现象
+     *   小结: 这是nginx自己实现的多进程 如何共享一个server FD。其实高版本的内核已经支持了这个功能，无需再nginx 应用层自己实现负载均衡，而是由linux reuse port自己实现即可，然后通过设置server FD上的epoll_exclusice标志位来让内核wakeup方法只唤醒一个worker进程即可。有缘再看
+     */
     if (ngx_use_accept_mutex) {
         if (ngx_accept_disabled > 0) {
             ngx_accept_disabled--;
